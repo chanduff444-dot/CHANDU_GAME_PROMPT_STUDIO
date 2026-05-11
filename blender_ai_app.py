@@ -11,7 +11,7 @@ class BlenderAIApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Chandu AI Lab - Blender Copilot")
+        self.title("Chandu Game Prompt Studio")
         self.geometry("1180x760")
         self.minsize(980, 680)
 
@@ -26,6 +26,12 @@ class BlenderAIApp(ctk.CTk):
         self.panel = "#2a2a2a"
         self.panel_alt = "#242424"
         self.text = "#f2f2f2"
+        self.active_section = "Dashboard"
+        self.prompt_presets = {
+            "Character": "Create a game-ready fantasy character in Blender with clean topology, armor, cloth folds, and a neutral standing pose.",
+            "Gear System": "Create a realistic mechanical watch gear system in Blender with interlocking brass gears, a dark metal baseplate, and studio lighting.",
+            "Environment": "Create a stylized sci-fi environment in Blender with modular structures, atmospheric lighting, and game-ready composition.",
+        }
 
         self.current_models = []
         self._build_ui()
@@ -35,83 +41,135 @@ class BlenderAIApp(ctk.CTk):
         self.poll_status()
 
     def _build_ui(self):
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_columnconfigure(0, weight=0)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
 
-        header = ctk.CTkFrame(self, fg_color=self.panel, corner_radius=10)
-        header.grid(row=0, column=0, padx=14, pady=(12, 10), sticky="ew")
+        sidebar = ctk.CTkFrame(self, fg_color="#212121", corner_radius=0, width=260)
+        sidebar.grid(row=0, column=0, rowspan=2, sticky="nsew")
+        sidebar.grid_rowconfigure(8, weight=1)
+        sidebar.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            sidebar,
+            text="CHANDU\nGAME\nPROMPT\nSTUDIO",
+            justify="left",
+            font=ctk.CTkFont(family="Bahnschrift", size=24, weight="bold"),
+            text_color=self.accent,
+        ).grid(row=0, column=0, padx=18, pady=(22, 12), sticky="w")
+
+        ctk.CTkLabel(
+            sidebar,
+            text="Prompt-to-Blender workspace\nfor game assets and scenes",
+            justify="left",
+            font=ctk.CTkFont(family="Bahnschrift", size=13),
+            text_color="#d4d4d4",
+        ).grid(row=1, column=0, padx=18, pady=(0, 18), sticky="w")
+
+        self.nav_buttons = []
+        for index, label in enumerate(["Dashboard", "Characters", "Environments", "Gears", "Exports"]):
+            button = ctk.CTkButton(
+                sidebar,
+                text=label,
+                command=lambda value=label: self.set_section(value),
+                fg_color=self.accent if index == 0 else "#303030",
+                hover_color="#ffad32" if index == 0 else "#3b3b3b",
+                text_color="#121212" if index == 0 else self.text,
+                font=ctk.CTkFont(family="Bahnschrift", size=14, weight="bold" if index == 0 else "normal"),
+                height=40,
+            )
+            button.grid(row=index + 2, column=0, padx=18, pady=(0, 10), sticky="ew")
+            self.nav_buttons.append(button)
+
+        studio_card = ctk.CTkFrame(sidebar, fg_color="#2b2b2b", corner_radius=12)
+        studio_card.grid(row=7, column=0, padx=18, pady=(18, 12), sticky="ew")
+        studio_card.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            studio_card,
+            text="Studio Goals",
+            font=ctk.CTkFont(family="Bahnschrift", size=15, weight="bold"),
+            text_color=self.accent,
+        ).grid(row=0, column=0, padx=12, pady=(12, 4), sticky="w")
+        ctk.CTkLabel(
+            studio_card,
+            text="• Game-ready assets\n• Blender automation\n• Unreal pipeline later",
+            justify="left",
+            font=self.font_ui,
+            text_color=self.text,
+        ).grid(row=1, column=0, padx=12, pady=(0, 12), sticky="w")
+
+        content = ctk.CTkFrame(self, fg_color="transparent")
+        content.grid(row=0, column=1, rowspan=2, padx=14, pady=14, sticky="nsew")
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_rowconfigure(2, weight=1)
+
+        header = ctk.CTkFrame(content, fg_color=self.panel, corner_radius=14)
+        header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
         header.grid_columnconfigure(1, weight=0)
 
-        ctk.CTkLabel(
+        self.header_title = ctk.CTkLabel(
             header,
-            text="Chandu AI Lab  |  Blender Prompt Studio",
+            text="Chandu Game Prompt Studio",
             font=self.font_title,
             text_color=self.accent,
-        ).grid(row=0, column=0, padx=14, pady=10, sticky="w")
-
-        status_frame = ctk.CTkFrame(header, fg_color="transparent")
-        status_frame.grid(row=0, column=1, padx=12, pady=8, sticky="e")
-
-        self.ollama_status = ctk.CTkLabel(
-            status_frame, text="Ollama: checking", font=self.font_ui, text_color="#f1c40f"
         )
-        self.ollama_status.grid(row=0, column=0, padx=(0, 12))
+        self.header_title.grid(row=0, column=0, padx=18, pady=(14, 4), sticky="w")
 
-        self.blender_status = ctk.CTkLabel(
-            status_frame, text="Blender: checking", font=self.font_ui, text_color="#f1c40f"
+        self.header_subtitle = ctk.CTkLabel(
+            header,
+            text="Dashboard",
+            font=ctk.CTkFont(family="Bahnschrift", size=13),
+            text_color="#d5d5d5",
         )
-        self.blender_status.grid(row=0, column=1)
+        self.header_subtitle.grid(row=1, column=0, padx=18, pady=(0, 14), sticky="w")
 
-        controls = ctk.CTkFrame(self, fg_color=self.panel, corner_radius=10)
-        controls.grid(row=1, column=0, padx=14, pady=(0, 10), sticky="ew")
-        controls.grid_columnconfigure(2, weight=1)
-
-        ctk.CTkLabel(controls, text="Model", font=self.font_ui).grid(
-            row=0, column=0, padx=(14, 8), pady=12
+        header_action = ctk.CTkButton(
+            header,
+            text="Export Pack",
+            fg_color=self.accent,
+            hover_color="#ffad32",
+            text_color="#121212",
+            font=ctk.CTkFont(family="Bahnschrift", size=13, weight="bold"),
+            width=130,
         )
+        header_action.grid(row=0, column=1, rowspan=2, padx=16, pady=14, sticky="e")
 
-        self.model_box = ctk.CTkComboBox(
-            controls,
-            values=["loading..."],
-            width=360,
-            font=self.font_ui,
-            dropdown_font=self.font_ui,
-            fg_color=self.panel_alt,
-            button_color=self.accent,
-            button_hover_color="#ffad32",
-            border_color="#3a3a3a",
-        )
-        self.model_box.grid(row=0, column=1, padx=6, pady=12, sticky="w")
-
-        self.refresh_button = ctk.CTkButton(
-            controls,
-            text="Refresh Models",
-            command=self.refresh_models,
-            fg_color="#4a4a4a",
-            hover_color="#5a5a5a",
-            font=self.font_ui,
-            width=140,
-        )
-        self.refresh_button.grid(row=0, column=2, padx=8, pady=12, sticky="w")
-
-        body = ctk.CTkFrame(self, fg_color="transparent")
-        body.grid(row=2, column=0, padx=14, pady=(0, 12), sticky="nsew")
+        body = ctk.CTkFrame(content, fg_color="transparent")
+        body.grid(row=2, column=0, sticky="nsew")
         body.grid_columnconfigure(0, weight=1)
         body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=0)
         body.grid_rowconfigure(1, weight=1)
+        body.grid_rowconfigure(2, weight=1)
 
-        prompt_panel = ctk.CTkFrame(body, fg_color=self.panel, corner_radius=10)
-        prompt_panel.grid(row=0, column=0, rowspan=2, padx=(0, 8), sticky="nsew")
-        prompt_panel.grid_rowconfigure(1, weight=1)
+        prompt_panel = ctk.CTkFrame(body, fg_color=self.panel, corner_radius=14)
+        prompt_panel.grid(row=0, column=0, rowspan=3, padx=(0, 8), sticky="nsew")
+        prompt_panel.grid_rowconfigure(2, weight=1)
         prompt_panel.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
             prompt_panel,
-            text="Prompt",
+            text="Prompt Workspace",
             font=ctk.CTkFont(family="Bahnschrift", size=18, weight="bold"),
             text_color=self.accent,
         ).grid(row=0, column=0, padx=12, pady=(12, 6), sticky="w")
+
+        preset_row = ctk.CTkFrame(prompt_panel, fg_color="transparent")
+        preset_row.grid(row=1, column=0, padx=12, pady=(0, 10), sticky="ew")
+        preset_row.grid_columnconfigure((0, 1, 2), weight=1)
+
+        for index, (name, prompt) in enumerate(self.prompt_presets.items()):
+            ctk.CTkButton(
+                preset_row,
+                text=name,
+                command=lambda value=prompt: self.load_prompt_preset(value),
+                fg_color="#353535",
+                hover_color="#434343",
+                font=ctk.CTkFont(family="Bahnschrift", size=13),
+                height=34,
+            ).grid(row=0, column=index, padx=(0 if index == 0 else 6, 0 if index == 2 else 6), sticky="ew")
 
         self.prompt_text = ctk.CTkTextbox(
             prompt_panel,
@@ -121,14 +179,14 @@ class BlenderAIApp(ctk.CTk):
             border_color="#3a3a3a",
             border_width=1,
         )
-        self.prompt_text.grid(row=1, column=0, padx=12, pady=(0, 10), sticky="nsew")
+        self.prompt_text.grid(row=2, column=0, padx=12, pady=(0, 10), sticky="nsew")
         self.prompt_text.insert(
             "1.0",
             "Create a stylized low-poly spaceship with orange emissive lights, add floor, camera, and key light.",
         )
 
         button_row = ctk.CTkFrame(prompt_panel, fg_color="transparent")
-        button_row.grid(row=2, column=0, padx=12, pady=(0, 12), sticky="ew")
+        button_row.grid(row=3, column=0, padx=12, pady=(0, 12), sticky="ew")
         button_row.grid_columnconfigure((0, 1, 2), weight=1)
 
         self.generate_button = ctk.CTkButton(
@@ -162,8 +220,55 @@ class BlenderAIApp(ctk.CTk):
         )
         self.generate_run_button.grid(row=0, column=2, padx=(6, 0), sticky="ew")
 
-        code_panel = ctk.CTkFrame(body, fg_color=self.panel, corner_radius=10)
-        code_panel.grid(row=0, column=1, padx=(8, 0), sticky="nsew")
+        gallery_panel = ctk.CTkFrame(body, fg_color=self.panel, corner_radius=14)
+        gallery_panel.grid(row=0, column=1, padx=(8, 0), pady=(0, 8), sticky="nsew")
+        gallery_panel.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            gallery_panel,
+            text="Project Gallery",
+            font=ctk.CTkFont(family="Bahnschrift", size=16, weight="bold"),
+            text_color=self.accent,
+        ).grid(row=0, column=0, padx=12, pady=(12, 4), sticky="w")
+
+        gallery_items = [
+            ("Characters", "Armored heroes and rig-ready models"),
+            ("Gears", "Mechanical systems and watch parts"),
+            ("Scenes", "Stylized worlds and environments"),
+        ]
+        for index, (title, desc) in enumerate(gallery_items, start=1):
+            item = ctk.CTkFrame(gallery_panel, fg_color="#313131", corner_radius=10)
+            item.grid(row=index, column=0, padx=12, pady=6, sticky="ew")
+            item.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(
+                item,
+                text=title,
+                font=ctk.CTkFont(family="Bahnschrift", size=13, weight="bold"),
+                text_color=self.text,
+            ).grid(row=0, column=0, padx=10, pady=(8, 2), sticky="w")
+            ctk.CTkLabel(
+                item,
+                text=desc,
+                font=ctk.CTkFont(family="Bahnschrift", size=12),
+                text_color="#c9c9c9",
+            ).grid(row=1, column=0, padx=10, pady=(0, 8), sticky="w")
+
+        export_strip = ctk.CTkFrame(gallery_panel, fg_color="transparent")
+        export_strip.grid(row=4, column=0, padx=12, pady=(6, 12), sticky="ew")
+        export_strip.grid_columnconfigure((0, 1, 2), weight=1)
+
+        for index, label in enumerate(["FBX", "glTF", "Unreal"]):
+            ctk.CTkButton(
+                export_strip,
+                text=f"Export {label}",
+                command=lambda value=label: self.quick_export(value),
+                fg_color="#3b3b3b",
+                hover_color="#4a4a4a",
+                font=ctk.CTkFont(family="Bahnschrift", size=12),
+            ).grid(row=0, column=index, padx=(0 if index == 0 else 6, 0 if index == 2 else 6), sticky="ew")
+
+        code_panel = ctk.CTkFrame(body, fg_color=self.panel, corner_radius=14)
+        code_panel.grid(row=1, column=1, padx=(8, 0), sticky="nsew")
         code_panel.grid_rowconfigure(1, weight=1)
         code_panel.grid_columnconfigure(0, weight=1)
 
@@ -184,8 +289,8 @@ class BlenderAIApp(ctk.CTk):
         )
         self.code_text.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="nsew")
 
-        log_panel = ctk.CTkFrame(body, fg_color=self.panel, corner_radius=10)
-        log_panel.grid(row=1, column=1, padx=(8, 0), pady=(8, 0), sticky="nsew")
+        log_panel = ctk.CTkFrame(body, fg_color=self.panel, corner_radius=14)
+        log_panel.grid(row=2, column=1, padx=(8, 0), pady=(8, 0), sticky="nsew")
         log_panel.grid_rowconfigure(1, weight=1)
         log_panel.grid_columnconfigure(0, weight=1)
 
@@ -206,6 +311,47 @@ class BlenderAIApp(ctk.CTk):
             border_width=1,
         )
         self.log_text.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="nsew")
+        
+    def _create_summary_card(self, parent, column, title, text):
+        card = ctk.CTkFrame(parent, fg_color=self.panel, corner_radius=12)
+        card.grid(row=0, column=column, padx=6, sticky="ew")
+        card.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            card,
+            text=title,
+            font=ctk.CTkFont(family="Bahnschrift", size=14, weight="bold"),
+            text_color=self.accent,
+        ).grid(row=0, column=0, padx=12, pady=(12, 4), sticky="w")
+        ctk.CTkLabel(
+            card,
+            text=text,
+            font=self.font_ui,
+            text_color=self.text,
+            justify="left",
+        ).grid(row=1, column=0, padx=12, pady=(0, 12), sticky="w")
+
+    def set_section(self, section):
+        self.active_section = section
+        if hasattr(self, "header_subtitle"):
+            self.header_subtitle.configure(text=section)
+
+        for button in getattr(self, "nav_buttons", []):
+            active = button.cget("text") == section
+            button.configure(
+                fg_color=self.accent if active else "#303030",
+                hover_color="#ffad32" if active else "#3b3b3b",
+                text_color="#121212" if active else self.text,
+            )
+
+        if section != "Dashboard":
+            self.log(f"Switched to {section} workspace")
+
+    def load_prompt_preset(self, prompt):
+        self._set_text(self.prompt_text, prompt)
+        self.log("Loaded prompt preset into the workspace.")
+
+    def quick_export(self, format_name):
+        self.log(f"Queued export for {format_name}.")
 
     def _set_busy(self, busy):
         state = "disabled" if busy else "normal"

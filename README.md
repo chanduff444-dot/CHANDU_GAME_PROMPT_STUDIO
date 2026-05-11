@@ -1,6 +1,8 @@
-# Chandu AI Lab - Blender Prompt Studio
+# Chandu Game Prompt Studio
 
 Offline prompt-to-Blender app using Ollama.
+Built to feel like a compact studio dashboard for prompt-driven 3D and game asset creation.
+Future plan: connect the same asset pipeline to Unreal Engine as well.
 
 ## Flow
 
@@ -50,3 +52,12 @@ Offline prompt-to-Blender app using Ollama.
 - Blender listener runs on localhost:6789.
 - If app shows Blender waiting, listener is not running yet.
 - The bpy import warning in VS Code is normal outside Blender.
+- Unreal Engine integration will be added later through export/import or automation scripts.
+
+## Studio-style feature direction
+
+- cleaner project dashboard layout
+- asset generation presets for games and scenes
+- export pipeline for Blender, Unity, and Unreal
+- preview panels for prompts, logs, and generated code
+- branded studio UI with a more professional look and feel
