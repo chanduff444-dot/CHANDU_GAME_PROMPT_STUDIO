@@ -27,10 +27,93 @@ class BlenderAIApp(ctk.CTk):
         self.panel_alt = "#242424"
         self.text = "#f2f2f2"
         self.active_section = "Dashboard"
-        self.prompt_presets = {
-            "Character": "Create a game-ready fantasy character in Blender with clean topology, armor, cloth folds, and a neutral standing pose.",
-            "Gear System": "Create a realistic mechanical watch gear system in Blender with interlocking brass gears, a dark metal baseplate, and studio lighting.",
-            "Environment": "Create a stylized sci-fi environment in Blender with modular structures, atmospheric lighting, and game-ready composition.",
+        self.project_history = []
+        self.section_profiles = {
+            "Dashboard": {
+                "subtitle": "Studio overview",
+                "header_action": "Export Pack",
+                "prompt_title": "Prompt Workspace",
+                "default_prompt": "Create a stylized low-poly spaceship with orange emissive lights, add floor, camera, and key light.",
+                "presets": [
+                    ("Character", "Create a game-ready fantasy character in Blender with clean topology, armor, cloth folds, and a neutral standing pose."),
+                    ("Gear System", "Create a realistic mechanical watch gear system in Blender with interlocking brass gears, a dark metal baseplate, and studio lighting."),
+                    ("Environment", "Create a stylized sci-fi environment in Blender with modular structures, atmospheric lighting, and game-ready composition."),
+                ],
+                "gallery_title": "Project Gallery",
+                "gallery": [
+                    ("Latest Output", "Recently generated Blender scene or asset"),
+                    ("Characters", "Armored heroes and rig-ready models"),
+                    ("Gears", "Mechanical systems and watch parts"),
+                ],
+            },
+            "Characters": {
+                "subtitle": "Character workspace",
+                "header_action": "Character Pack",
+                "prompt_title": "Character Prompt Workspace",
+                "default_prompt": "Create a game-ready fantasy character in Blender with clean topology, armor, cloth folds, and a neutral standing pose.",
+                "presets": [
+                    ("Warrior", "Create a fantasy warrior character with armor, cape, sword, and shield, ready for a third-person game."),
+                    ("Sci-Fi Hero", "Create a futuristic armored hero with glowing accents, game-ready topology, and a strong pose."),
+                    ("Creature", "Create a stylized fantasy creature with clean topology, expressive silhouette, and rig-ready structure."),
+                ],
+                "gallery_title": "Character Library",
+                "gallery": [
+                    ("Armored Hero", "Game-ready warrior with clean topology and neutral stance"),
+                    ("NPC Soldier", "Efficient low-poly character for crowd scenes"),
+                    ("Boss Enemy", "Striking silhouette with strong fantasy details"),
+                ],
+            },
+            "Environments": {
+                "subtitle": "Environment workspace",
+                "header_action": "Scene Pack",
+                "prompt_title": "Environment Prompt Workspace",
+                "default_prompt": "Create a stylized sci-fi environment in Blender with modular structures, atmospheric lighting, and game-ready composition.",
+                "presets": [
+                    ("Sci-Fi Hall", "Create a modular sci-fi hallway environment with strong lighting, repeating panels, and game-ready layout."),
+                    ("Forest", "Create a stylized fantasy forest scene with layered trees, atmospheric fog, and cinematic lighting."),
+                    ("Street", "Create a game environment of a small street with storefronts, props, and natural composition."),
+                ],
+                "gallery_title": "Environment Gallery",
+                "gallery": [
+                    ("Sci-Fi Hall", "Modular corridor with atmospheric lighting and reusable pieces"),
+                    ("Forest Edge", "Stylized outdoor scene with depth and haze"),
+                    ("City Block", "Game-ready urban space with props and signage"),
+                ],
+            },
+            "Gears": {
+                "subtitle": "Mechanical workspace",
+                "header_action": "Mechanics Pack",
+                "prompt_title": "Mechanical Prompt Workspace",
+                "default_prompt": "Create a realistic mechanical watch gear system in Blender with interlocking brass gears, a dark metal baseplate, and studio lighting.",
+                "presets": [
+                    ("Watch Gear", "Create a mechanical watch movement with interlocking brass gears and precise spacing."),
+                    ("Engine", "Create a small mechanical engine assembly with pulleys, gears, and metal housing."),
+                    ("Robot", "Create a mechanical robot joint system with visible gears and industrial parts."),
+                ],
+                "gallery_title": "Mechanical Gallery",
+                "gallery": [
+                    ("Watch Movement", "Precision gear assembly with brass and steel materials"),
+                    ("Engine Core", "Compact mechanical blockout with rotating parts"),
+                    ("Robot Joint", "Industrial articulation and gear housing"),
+                ],
+            },
+            "Exports": {
+                "subtitle": "Export workspace",
+                "header_action": "Export Pack",
+                "prompt_title": "Export Prompt Workspace",
+                "default_prompt": "Prepare the current Blender asset for export with clean topology, separate parts, and game-engine friendly naming.",
+                "presets": [
+                    ("FBX Ready", "Prepare the scene for FBX export with clean transforms and organized objects."),
+                    ("glTF Ready", "Prepare the scene for glTF export with efficient materials and optimized topology."),
+                    ("Unreal Ready", "Prepare the asset for Unreal Engine with proper scale, separate parts, and clean hierarchy."),
+                ],
+                "gallery_title": "Export Targets",
+                "gallery": [
+                    ("FBX", "Best for broad engine compatibility and animation workflows"),
+                    ("glTF", "Efficient format for modern real-time pipelines"),
+                    ("Unreal", "Prepared for engine import and scene setup"),
+                ],
+            },
         }
 
         self.current_models = []
@@ -102,12 +185,14 @@ class BlenderAIApp(ctk.CTk):
         content = ctk.CTkFrame(self, fg_color="transparent")
         content.grid(row=0, column=1, rowspan=2, padx=14, pady=14, sticky="nsew")
         content.grid_columnconfigure(0, weight=1)
-        content.grid_rowconfigure(2, weight=1)
+        content.grid_rowconfigure(3, weight=1)
 
         header = ctk.CTkFrame(content, fg_color=self.panel, corner_radius=14)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
         header.grid_columnconfigure(1, weight=0)
+        header.grid_columnconfigure(2, weight=0)
+        header.grid_rowconfigure(2, weight=0)
 
         self.header_title = ctk.CTkLabel(
             header,
@@ -134,10 +219,65 @@ class BlenderAIApp(ctk.CTk):
             font=ctk.CTkFont(family="Bahnschrift", size=13, weight="bold"),
             width=130,
         )
-        header_action.grid(row=0, column=1, rowspan=2, padx=16, pady=14, sticky="e")
+        self.header_action = header_action
+        header_action.grid(row=0, column=2, rowspan=2, padx=(8, 16), pady=14, sticky="e")
+
+        status_frame = ctk.CTkFrame(header, fg_color="transparent")
+        status_frame.grid(row=0, column=1, rowspan=2, padx=8, pady=14, sticky="e")
+
+        self.ollama_status = ctk.CTkLabel(
+            status_frame,
+            text="Ollama: checking",
+            font=self.font_ui,
+            text_color="#f1c40f",
+        )
+        self.ollama_status.grid(row=0, column=0, pady=(0, 4), sticky="e")
+
+        self.blender_status = ctk.CTkLabel(
+            status_frame,
+            text="Blender: checking",
+            font=self.font_ui,
+            text_color="#f1c40f",
+        )
+        self.blender_status.grid(row=1, column=0, sticky="e")
+
+        model_strip = ctk.CTkFrame(header, fg_color=self.panel_alt, corner_radius=12)
+        model_strip.grid(row=2, column=0, columnspan=2, padx=14, pady=(0, 14), sticky="ew")
+        model_strip.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            model_strip,
+            text="Model",
+            font=ctk.CTkFont(family="Bahnschrift", size=13, weight="bold"),
+            text_color=self.text,
+        ).grid(row=0, column=0, padx=(12, 8), pady=12, sticky="w")
+
+        self.model_box = ctk.CTkComboBox(
+            model_strip,
+            values=["loading..."],
+            width=360,
+            font=self.font_ui,
+            dropdown_font=self.font_ui,
+            fg_color="#343434",
+            button_color=self.accent,
+            button_hover_color="#ffad32",
+            border_color="#4a4a4a",
+        )
+        self.model_box.grid(row=0, column=1, padx=6, pady=12, sticky="ew")
+
+        self.refresh_button = ctk.CTkButton(
+            model_strip,
+            text="Refresh Models",
+            command=self.refresh_models,
+            fg_color="#4a4a4a",
+            hover_color="#5a5a5a",
+            font=self.font_ui,
+            width=140,
+        )
+        self.refresh_button.grid(row=0, column=2, padx=(8, 12), pady=12, sticky="e")
 
         body = ctk.CTkFrame(content, fg_color="transparent")
-        body.grid(row=2, column=0, sticky="nsew")
+        body.grid(row=3, column=0, sticky="nsew")
         body.grid_columnconfigure(0, weight=1)
         body.grid_columnconfigure(1, weight=1)
         body.grid_rowconfigure(0, weight=0)
@@ -149,27 +289,31 @@ class BlenderAIApp(ctk.CTk):
         prompt_panel.grid_rowconfigure(2, weight=1)
         prompt_panel.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
+        self.prompt_panel_title_label = ctk.CTkLabel(
             prompt_panel,
             text="Prompt Workspace",
             font=ctk.CTkFont(family="Bahnschrift", size=18, weight="bold"),
             text_color=self.accent,
-        ).grid(row=0, column=0, padx=12, pady=(12, 6), sticky="w")
+        )
+        self.prompt_panel_title_label.grid(row=0, column=0, padx=12, pady=(12, 6), sticky="w")
 
         preset_row = ctk.CTkFrame(prompt_panel, fg_color="transparent")
         preset_row.grid(row=1, column=0, padx=12, pady=(0, 10), sticky="ew")
         preset_row.grid_columnconfigure((0, 1, 2), weight=1)
+        self.preset_buttons = []
 
-        for index, (name, prompt) in enumerate(self.prompt_presets.items()):
-            ctk.CTkButton(
+        for index in range(3):
+            button = ctk.CTkButton(
                 preset_row,
-                text=name,
-                command=lambda value=prompt: self.load_prompt_preset(value),
+                text="Preset",
+                command=lambda value="": self.load_prompt_preset(value),
                 fg_color="#353535",
                 hover_color="#434343",
                 font=ctk.CTkFont(family="Bahnschrift", size=13),
                 height=34,
-            ).grid(row=0, column=index, padx=(0 if index == 0 else 6, 0 if index == 2 else 6), sticky="ew")
+            )
+            button.grid(row=0, column=index, padx=(0 if index == 0 else 6, 0 if index == 2 else 6), sticky="ew")
+            self.preset_buttons.append(button)
 
         self.prompt_text = ctk.CTkTextbox(
             prompt_panel,
@@ -224,34 +368,34 @@ class BlenderAIApp(ctk.CTk):
         gallery_panel.grid(row=0, column=1, padx=(8, 0), pady=(0, 8), sticky="nsew")
         gallery_panel.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
+        self.gallery_title_label = ctk.CTkLabel(
             gallery_panel,
             text="Project Gallery",
             font=ctk.CTkFont(family="Bahnschrift", size=16, weight="bold"),
             text_color=self.accent,
-        ).grid(row=0, column=0, padx=12, pady=(12, 4), sticky="w")
+        )
+        self.gallery_title_label.grid(row=0, column=0, padx=12, pady=(12, 4), sticky="w")
 
-        gallery_items = [
-            ("Characters", "Armored heroes and rig-ready models"),
-            ("Gears", "Mechanical systems and watch parts"),
-            ("Scenes", "Stylized worlds and environments"),
-        ]
-        for index, (title, desc) in enumerate(gallery_items, start=1):
+        self.gallery_cards = []
+        for index in range(3):
             item = ctk.CTkFrame(gallery_panel, fg_color="#313131", corner_radius=10)
-            item.grid(row=index, column=0, padx=12, pady=6, sticky="ew")
+            item.grid(row=index + 1, column=0, padx=12, pady=6, sticky="ew")
             item.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(
+            title_label = ctk.CTkLabel(
                 item,
-                text=title,
+                text="Item",
                 font=ctk.CTkFont(family="Bahnschrift", size=13, weight="bold"),
                 text_color=self.text,
-            ).grid(row=0, column=0, padx=10, pady=(8, 2), sticky="w")
-            ctk.CTkLabel(
+            )
+            title_label.grid(row=0, column=0, padx=10, pady=(8, 2), sticky="w")
+            desc_label = ctk.CTkLabel(
                 item,
-                text=desc,
+                text="Description",
                 font=ctk.CTkFont(family="Bahnschrift", size=12),
                 text_color="#c9c9c9",
-            ).grid(row=1, column=0, padx=10, pady=(0, 8), sticky="w")
+            )
+            desc_label.grid(row=1, column=0, padx=10, pady=(0, 8), sticky="w")
+            self.gallery_cards.append((item, title_label, desc_label))
 
         export_strip = ctk.CTkFrame(gallery_panel, fg_color="transparent")
         export_strip.grid(row=4, column=0, padx=12, pady=(6, 12), sticky="ew")
@@ -330,10 +474,88 @@ class BlenderAIApp(ctk.CTk):
             justify="left",
         ).grid(row=1, column=0, padx=12, pady=(0, 12), sticky="w")
 
+    def _get_section_profile(self, section):
+        return self.section_profiles.get(section, self.section_profiles["Dashboard"])
+
+    def _shorten_text(self, text, limit=72):
+        text = " ".join(text.split())
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+
+    def _gallery_items_for_section(self, section):
+        profile = self._get_section_profile(section)
+        items = list(profile["gallery"])
+        section_history = [item for item in self.project_history if item["section"] == section]
+        if section_history:
+            latest = section_history[0]
+            items = [(latest["title"], latest["description"])] + items
+
+        unique_items = []
+        seen_titles = set()
+        for title, desc in items:
+            if title in seen_titles:
+                continue
+            seen_titles.add(title)
+            unique_items.append((title, desc))
+        return unique_items[: len(self.gallery_cards)]
+
+    def _apply_section_profile(self, section):
+        profile = self._get_section_profile(section)
+
+        if hasattr(self, "header_subtitle"):
+            self.header_subtitle.configure(text=profile["subtitle"])
+
+        if hasattr(self, "header_action"):
+            self.header_action.configure(text=profile["header_action"])
+
+        if hasattr(self, "prompt_panel_title_label"):
+            self.prompt_panel_title_label.configure(text=profile["prompt_title"])
+
+        if hasattr(self, "gallery_title_label"):
+            self.gallery_title_label.configure(text=profile["gallery_title"])
+
+        if hasattr(self, "preset_buttons"):
+            for button, (preset_name, preset_prompt) in zip(self.preset_buttons, profile["presets"]):
+                button.configure(
+                    text=preset_name,
+                    command=lambda value=preset_prompt: self.load_prompt_preset(value),
+                )
+
+        if hasattr(self, "prompt_text"):
+            self._set_text(self.prompt_text, profile["default_prompt"])
+
+        self._sync_gallery_cards(section)
+
+    def _sync_gallery_cards(self, section):
+        if not hasattr(self, "gallery_cards"):
+            return
+
+        for index, (title, desc) in enumerate(self._gallery_items_for_section(section)):
+            _, title_label, desc_label = self.gallery_cards[index]
+            title_label.configure(text=title)
+            desc_label.configure(text=desc)
+
+        for index in range(len(self._gallery_items_for_section(section)), len(self.gallery_cards)):
+            _, title_label, desc_label = self.gallery_cards[index]
+            title_label.configure(text="")
+            desc_label.configure(text="")
+
+    def _record_generation(self, section, prompt, model):
+        title = f"{section} • {model}"
+        description = self._shorten_text(prompt)
+        self.project_history.insert(0, {
+            "section": section,
+            "title": title,
+            "description": description,
+        })
+        self.project_history = self.project_history[:12]
+        if section == self.active_section:
+            self._sync_gallery_cards(section)
+
     def set_section(self, section):
         self.active_section = section
-        if hasattr(self, "header_subtitle"):
-            self.header_subtitle.configure(text=section)
+        self._apply_section_profile(section)
 
         for button in getattr(self, "nav_buttons", []):
             active = button.cget("text") == section
@@ -355,10 +577,10 @@ class BlenderAIApp(ctk.CTk):
 
     def _set_busy(self, busy):
         state = "disabled" if busy else "normal"
-        self.generate_button.configure(state=state)
-        self.run_button.configure(state=state)
-        self.generate_run_button.configure(state=state)
-        self.refresh_button.configure(state=state)
+        for widget_name in ("generate_button", "run_button", "generate_run_button", "refresh_button"):
+            widget = getattr(self, widget_name, None)
+            if widget is not None:
+                widget.configure(state=state)
 
     def _set_text(self, widget, text):
         widget.delete("1.0", "end")
@@ -382,15 +604,20 @@ class BlenderAIApp(ctk.CTk):
             ollama_ok = check_ollama()
             blender_ok = check_blender_listener()
 
-            if ollama_ok:
-                self.ollama_status.configure(text="Ollama: online", text_color="#44d17a")
-            else:
-                self.ollama_status.configure(text="Ollama: offline", text_color="#ff6363")
+            ollama_status = getattr(self, "ollama_status", None)
+            blender_status = getattr(self, "blender_status", None)
 
-            if blender_ok:
-                self.blender_status.configure(text="Blender: connected", text_color="#44d17a")
-            else:
-                self.blender_status.configure(text="Blender: waiting", text_color="#f1c40f")
+            if ollama_status is not None:
+                if ollama_ok:
+                    ollama_status.configure(text="Ollama: online", text_color="#44d17a")
+                else:
+                    ollama_status.configure(text="Ollama: offline", text_color="#ff6363")
+
+            if blender_status is not None:
+                if blender_ok:
+                    blender_status.configure(text="Blender: connected", text_color="#44d17a")
+                else:
+                    blender_status.configure(text="Blender: waiting", text_color="#f1c40f")
         finally:
             self.after(2500, self.poll_status)
 
@@ -422,6 +649,7 @@ class BlenderAIApp(ctk.CTk):
     def _run_generation(self, auto_send):
         prompt = self._get_prompt()
         model = self.model_box.get().strip()
+        section = self.active_section
 
         if not prompt:
             self.log("Prompt is empty.")
@@ -452,6 +680,7 @@ class BlenderAIApp(ctk.CTk):
 
                 self.after(0, lambda: self._set_text(self.code_text, cleaned))
                 self.after(0, lambda: self.log("Code generated and validated."))
+                self.after(0, lambda: self._record_generation(section, prompt, model))
 
                 if auto_send:
                     if not check_blender_listener():
