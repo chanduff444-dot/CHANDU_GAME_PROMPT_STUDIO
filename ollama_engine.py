@@ -1,6 +1,6 @@
 """
-Chandu AI Lab - Ollama Engine
-Handles all communication with local Ollama AI.
+Chandu Prompt Studio — Ollama AI Engine
+Handles: planning, code generation, error fixing
 """
 
 import requests
@@ -8,93 +8,50 @@ import json
 
 OLLAMA_URL = "http://localhost:11434"
 
-SYSTEM_PROMPT = """You are a Blender Python (bpy) expert for Chandu AI Lab.
-The user will describe what they want to create or do in Blender.
-You MUST respond with ONLY executable Blender Python code.
-No explanations. No markdown. No code blocks. No comments unless inside the code.
+# ── Prompts ──────────────────────────────────────────────────────
 
-MANDATORY RULES:
-- Always start with: import bpy
-- Always clear scene: bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
-- ONLY use valid bpy API calls. Check every function name.
-- NEVER use nonexistent attributes like: .metrics, .size (on primitives), .horizon_color
-- For primitives use: bpy.ops.mesh.primitive_cube_add(size=2)
-- For world settings use: bpy.context.scene.world.use_nodes = True
-- NEVER access None objects. Check object existence first.
+PLANNER_SYSTEM = """You are the planning brain of Chandu Prompt Studio, an autonomous Blender AI agent.
+Given the user's request and the current Blender scene state, create a clear step-by-step action plan.
+Be concise. List only the key steps needed. Max 6 steps.
+Format: numbered list only. No extra explanation."""
 
-CORRECT EXAMPLES:
-- Add cube: bpy.ops.mesh.primitive_cube_add(size=2, location=(0,0,0))
-- Add sphere: bpy.ops.mesh.primitive_uv_sphere_add(radius=1)
-- Get object: obj = bpy.context.active_object
-- Set material: obj.data.materials.append(mat)
-- Rotate object: obj.rotation_euler = (0, 0, 1.57)
-- Keyframe: obj.keyframe_insert(data_path='location', frame=1)
+CODER_SYSTEM = """You are an expert Blender Python (bpy) coder for Chandu Prompt Studio.
+You receive a user request, the current scene state, and an action plan.
+You MUST output ONLY valid executable Blender Python code.
+Rules:
+- Start with: import bpy
+- Never use markdown, no backticks, no explanations
+- Clear existing objects when starting fresh: bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
+- Use only valid bpy API — bpy.ops, bpy.data, bpy.context
+- For materials always use nodes: mat.use_nodes = True
+- For animations use keyframes (frame 1-120)
+- Handle all potential errors inside the code with try/except where needed"""
 
-ERRORS TO AVOID:
-- Do NOT use 'size' parameter on object rotation/scale
-- Do NOT access properties on None objects
-- Do NOT use undefined attributes
-- Do NOT try to access context if no object is active
-- Always use proper operator parameter names from Blender docs
+FIXER_SYSTEM = """You are an autonomous Blender Python error-fixer for Chandu Prompt Studio.
+You will be given: the original code, the error message, and the current scene state.
+Your job is to output a FIXED version of the code that resolves the error.
+Output ONLY the corrected Python code. No explanations. No markdown."""
 
-For gears specifically:
-- Use bmesh for tooth geometry or model simple circular discs
-- Use proper rotation matrices for gear meshing
-- Test tooth count ratios before setting rotation speeds
-"""
+# ── Helpers ──────────────────────────────────────────────────────
 
-def get_models():
-    """Fetch list of available Ollama models."""
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
-        if r.status_code == 200:
-            data = r.json()
-            return [m["name"] for m in data.get("models", [])]
-    except:
-        pass
-    return []
-
-def check_ollama():
-    """Check if Ollama is running."""
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
-        return r.status_code == 200
-    except:
-        return False
-
-def generate_blender_code(prompt, model, on_token=None):
-    """
-    Stream AI response from Ollama.
-    on_token: callback(text) called for each chunk — use to update UI live.
-    Returns final complete code string.
-    """
-    full_prompt = f"""Create Blender Python code for this request:
-
-{prompt}
-
-Return ONLY the Python code. Nothing else."""
-
+def _stream(model, system, prompt, on_token=None):
+    """Stream from Ollama and return full response."""
     payload = {
         "model": model,
-        "prompt": full_prompt,
-        "system": SYSTEM_PROMPT,
+        "system": system,
+        "prompt": prompt,
         "stream": True,
     }
-
-    full_response = ""
+    full = ""
     try:
-        with requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json=payload,
-            stream=True,
-            timeout=120
-        ) as r:
+        with requests.post(f"{OLLAMA_URL}/api/generate", json=payload,
+                           stream=True, timeout=180) as r:
             for line in r.iter_lines():
                 if line:
                     try:
                         data = json.loads(line)
                         token = data.get("response", "")
-                        full_response += token
+                        full += token
                         if on_token:
                             on_token(token)
                         if data.get("done"):
@@ -102,31 +59,113 @@ Return ONLY the Python code. Nothing else."""
                     except:
                         pass
     except requests.exceptions.ConnectionError:
-        raise ConnectionError("Cannot connect to Ollama. Is it running? Run: ollama serve")
-    except Exception as e:
-        raise RuntimeError(f"Ollama error: {e}")
+        raise ConnectionError("Ollama not running. Start with: ollama serve")
+    return full
 
-    return full_response
 
 def clean_code(raw):
-    """Strip markdown and non-code lines from AI output."""
+    """Strip markdown fences and non-code preamble."""
     import re
-    text = re.sub(r"```python", "", raw)
-    text = re.sub(r"```", "", text)
+    text = re.sub(r"```python\s*", "", raw)
+    text = re.sub(r"```\s*", "", text)
     lines = text.splitlines()
     code_lines = []
     in_code = False
-    skip_starts = ("here", "this", "below", "note:", "sure", "certainly",
-                   "i will", "let me", "the following", "of course")
+    skip = ("here", "this", "below", "note:", "sure", "certainly",
+            "i will", "let me", "the following", "of course", "to ")
     for line in lines:
         s = line.strip().lower()
         if not in_code and s == "":
             continue
-        if any(s.startswith(p) for p in skip_starts):
+        if any(s.startswith(p) for p in skip) and not in_code:
             continue
-        if s.startswith(("import ", "from ", "bpy", "#", "def ", "class ")):
+        if s.startswith(("import ", "from ", "bpy", "#", "def ", "class ", "mat", "obj")):
             in_code = True
         if in_code:
             code_lines.append(line)
     result = "\n".join(code_lines).strip()
     return result if result else text.strip()
+
+# ── Public API ────────────────────────────────────────────────────
+
+def check_ollama():
+    try:
+        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
+        return r.status_code == 200
+    except:
+        return False
+
+
+def get_models():
+    try:
+        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+        if r.status_code == 200:
+            return [m["name"] for m in r.json().get("models", [])]
+    except:
+        pass
+    return []
+
+
+def plan_actions(user_prompt, scene_state, model, on_token=None):
+    """Step 1: AI plans what actions to take."""
+    scene_summary = f"""
+Current scene has:
+- {len(scene_state.get('objects', []))} mesh objects: {[o['name'] for o in scene_state.get('objects', [])]}
+- {len(scene_state.get('lights', []))} lights
+- {len(scene_state.get('cameras', []))} cameras
+- Materials: {[m['name'] for m in scene_state.get('materials', [])]}
+- Frame range: {scene_state.get('frame_start')} - {scene_state.get('frame_end')}
+"""
+    prompt = f"User request: {user_prompt}\n\nCurrent Blender scene:\n{scene_summary}\n\nCreate an action plan:"
+    return _stream(model, PLANNER_SYSTEM, prompt, on_token=on_token)
+
+
+def generate_code(user_prompt, scene_state, plan, model, on_token=None):
+    """Step 2: AI generates Blender Python code."""
+    scene_json = json.dumps(scene_state, indent=2)
+    prompt = f"""User request: {user_prompt}
+
+Action plan:
+{plan}
+
+Current scene state:
+{scene_json}
+
+Write the complete Blender Python code:"""
+    raw = _stream(model, CODER_SYSTEM, prompt, on_token=on_token)
+    return clean_code(raw)
+
+
+def fix_code(original_code, error_message, scene_state, model, on_token=None):
+    """Step 3: AI fixes broken code automatically."""
+    scene_json = json.dumps(scene_state, indent=2)
+    prompt = f"""Original code that failed:
+{original_code}
+
+Error message:
+{error_message}
+
+Current scene state:
+{scene_json}
+
+Write the fixed code:"""
+    raw = _stream(model, FIXER_SYSTEM, prompt, on_token=on_token)
+    return clean_code(raw)
+
+
+def generate_blender_code(prompt, model, on_token=None):
+    """Compatibility wrapper: generate Blender code given only a prompt and model.
+
+    This keeps older callers working (blender_ai_app, ai_engine) by creating
+    a minimal empty scene state and asking the planner for a short plan,
+    then requesting code generation. The `on_token` callback streams code tokens.
+    """
+    # Minimal scene state for backward compatibility
+    scene_state = {}
+    # Create a short plan (no streaming for plan here)
+    try:
+        plan = plan_actions(prompt, scene_state, model, on_token=None)
+    except Exception:
+        plan = ""
+    # Generate code (stream tokens via on_token)
+    return generate_code(prompt, scene_state, plan, model, on_token=on_token)

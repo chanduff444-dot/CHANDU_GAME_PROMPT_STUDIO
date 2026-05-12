@@ -1,4 +1,5 @@
 import socket
+import json
 
 HOST = "localhost"
 PORT = 6789
@@ -16,7 +17,7 @@ def check_blender_listener(host=HOST, port=PORT, timeout=0.75):
 
 def send_code_to_blender(code, host=HOST, port=PORT, timeout=20):
     """Send Python code to Blender listener and return execution result text."""
-    payload = code.encode("utf-8") + END_MARKER
+    payload = json.dumps({"cmd": "execute", "code": code}).encode("utf-8") + END_MARKER
 
     with socket.create_connection((host, port), timeout=timeout) as sock:
         sock.sendall(payload)

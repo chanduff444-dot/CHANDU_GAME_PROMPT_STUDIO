@@ -5,13 +5,14 @@ import customtkinter as ctk
 from blender_bridge import check_blender_listener, send_code_to_blender
 from code_cleaner import validate_code
 from ollama_engine import check_ollama, clean_code, generate_blender_code, get_models
+from agent import run_agent
 
 
 class BlenderAIApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Chandu Game Prompt Studio")
+        self.title("Chandu Prompt Studio")
         self.geometry("1180x760")
         self.minsize(980, 680)
 
@@ -196,7 +197,7 @@ class BlenderAIApp(ctk.CTk):
 
         self.header_title = ctk.CTkLabel(
             header,
-            text="Chandu Game Prompt Studio",
+            text="Chandu Prompt Studio",
             font=self.font_title,
             text_color=self.accent,
         )
@@ -666,10 +667,45 @@ class BlenderAIApp(ctk.CTk):
         def on_token(token):
             self.after(0, lambda: self._append_text(self.code_text, token))
 
+        def on_status(message):
+            self.after(0, lambda: self.log(message))
+
+        def on_scene(_state):
+            return None
+
+        def on_code(code):
+            self.after(0, lambda: self._set_text(self.code_text, code))
+
+        def on_success(message):
+            self.after(0, lambda: self.log(message))
+
+        def on_error(message):
+            self.after(0, lambda: self.log(f"Error: {message}"))
+
+        def on_retry(attempt, error_message):
+            self.after(0, lambda: self.log(f"Retry {attempt}: {error_message}"))
+
         def worker():
             try:
-                generated = generate_blender_code(prompt=prompt, model=model, on_token=on_token)
-                cleaned = clean_code(generated)
+                if auto_send:
+                    callbacks = {
+                        "on_status": on_status,
+                        "on_scene": on_scene,
+                        "on_code": on_code,
+                        "on_plan_token": on_token,
+                        "on_code_token": on_token,
+                        "on_fix_token": on_token,
+                        "on_success": on_success,
+                        "on_error": on_error,
+                        "on_retry": on_retry,
+                    }
+                    success = run_agent(prompt, model, callbacks)
+                    if not success:
+                        raise RuntimeError("Autonomous agent failed to complete the Blender run.")
+                    cleaned = self._get_code()
+                else:
+                    generated = generate_blender_code(prompt=prompt, model=model, on_token=on_token)
+                    cleaned = clean_code(generated)
 
                 ok, err = validate_code(cleaned)
                 if not ok:
@@ -681,14 +717,6 @@ class BlenderAIApp(ctk.CTk):
                 self.after(0, lambda: self._set_text(self.code_text, cleaned))
                 self.after(0, lambda: self.log("Code generated and validated."))
                 self.after(0, lambda: self._record_generation(section, prompt, model))
-
-                if auto_send:
-                    if not check_blender_listener():
-                        raise ConnectionError(
-                            "Blender listener is not reachable. Run blender_listener.py inside Blender Scripting tab."
-                        )
-                    result = send_code_to_blender(cleaned)
-                    self.after(0, lambda: self.log(f"Blender response: {result}"))
 
             except Exception as exc:
                 self.after(0, lambda: self.log(f"Error: {exc}"))

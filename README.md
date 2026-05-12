@@ -1,63 +1,63 @@
-# Chandu Game Prompt Studio
+# Chandu Prompt Studio — Autonomous Blender Agent (Level 3)
 
-Offline prompt-to-Blender app using Ollama.
-Built to feel like a compact studio dashboard for prompt-driven 3D and game asset creation.
-Future plan: connect the same asset pipeline to Unreal Engine as well.
+This project provides an autonomous Blender agent that:
 
-## Flow
+- Reads Blender scene state
+- Uses a local Ollama model to plan, generate, and fix Blender Python code
+- Executes code inside Blender via a socket listener
+- Retries automatically (configurable retries) and reports results
 
-1. You type a prompt in the desktop app.
-2. App sends prompt to local Ollama model.
-3. App receives Blender Python code.
-4. App sends code to Blender listener over socket.
-5. Blender executes code and returns status.
+## Key Scripts
 
-## Files
+- `blender_listener.py`: Run inside Blender (Scripting tab). Exposes a socket API for scene read/execute.
+- `agent.py`: Core autonomous loop (plan → code → execute → fix → retry).
+- `ollama_engine.py`: Planner / coder / fixer helpers and streaming support.
+- `app.py`: Desktop UI (CustomTkinter) for prompts, logs, models, and running the agent.
+- `requirements.txt`: Python dependencies.
 
-- blender_listener.py: Run inside Blender once per session.
-- blender_ai_app.py: Desktop UI app.
-- blender_bridge.py: Socket client from app to Blender.
-- ollama_engine.py: Ollama integration and streaming.
-- code_cleaner.py: Code cleanup and syntax validation.
-- requirements.txt: Python dependencies.
+## Quick Start
 
-## Setup
+1. Install Python deps:
 
-1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-   pip install -r requirements.txt
+2. Start Ollama server locally:
 
-2. Start Ollama server:
+```bash
+ollama serve
+```
 
-   ollama serve
+3. Pull a model (example):
 
-3. Pull at least one model (example):
+```bash
+ollama pull deepseek-coder:6.7b
+```
 
-   ollama pull llama3.1
+4. Start Blender and run the listener:
 
-4. Start Blender and run listener:
+Open Blender → Scripting tab → open `blender_listener.py` → Run Script
 
-   - Open Blender -> Scripting tab.
-   - Open blender_listener.py.
-   - Click Run Script.
+5. Launch the desktop app:
 
-5. Start app:
+```bash
+python app.py
+```
 
-   python blender_ai_app.py
+6. In the app: select a model, enter a prompt, and click `RUN AGENT`.
 
-   or double-click run_app.bat
+## Notes & Troubleshooting
 
-## Notes
+- Blender listener default: `localhost:6789` (update if needed in `agent.py`).
+- If the app cannot reach Ollama, ensure `ollama serve` is running and the model is pulled.
+- Run `blender_listener.py` inside Blender — `bpy` only works in Blender's Python.
+- The agent will attempt up to the configured retries to auto-fix errors returned from Blender.
 
-- Blender listener runs on localhost:6789.
-- If app shows Blender waiting, listener is not running yet.
-- The bpy import warning in VS Code is normal outside Blender.
-- Unreal Engine integration will be added later through export/import or automation scripts.
+## Next Steps
 
-## Studio-style feature direction
+- Add authentication or TLS for remote Blender sessions.
+- Add more robust validation of generated code before execution.
+- Improve model prompts for fidelity and safety checks.
 
-- cleaner project dashboard layout
-- asset generation presets for games and scenes
-- export pipeline for Blender, Unity, and Unreal
-- preview panels for prompts, logs, and generated code
-- branded studio UI with a more professional look and feel
+Enjoy building with Chandu Prompt Studio! If you want, I can run a quick code validation or wire up a ZIP packaging step next.
